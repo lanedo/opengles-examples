@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <X11/Xatom.h>
 #include <GLES2/gl2.h>
 #include <EGL/egl.h>
 #include <math.h>
@@ -11,6 +12,7 @@
 
 const char* vertexSrc = "attribute vec4 position; varying mediump vec2 pos; void main() { gl_Position = position; pos = position.xy; }";
 const char* fragmentSrc = "varying mediump vec2 pos; uniform mediump float phase; void main() { gl_FragColor = vec4(1, 1, 1, 1) * sin((pos.x * pos.x + pos.y * pos.y) * 40.0 + phase); }";
+//const char* fragmentSrc = "varying mediump vec2 pos; uniform mediump float phase; void main() { gl_FragColor = vec4(1, 1, 1, 1) * step(pos.x * pos.x + pos.y * pos.y, phase * 0.2); }";
 
 void printShaderInfoLog(GLuint shader) {
 	GLint length;
@@ -45,8 +47,8 @@ EGLSurface esfc;
 	
 const float vertexArray[] = {
 	0, -1, 0, 1,
-	-1, 1, 0, 1,
-	1, 1, 0, 1
+	1, 1, 0, 1,
+	-1, 1, 0, 1
 };
 
 void render() {
@@ -64,11 +66,9 @@ void render() {
 		glEnableVertexAttribArray(0);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 3);
 		
-		glFinish();
-		eglWaitGL();			
 		eglSwapBuffers(edpy, esfc);
 		
-		offset = fmodf(offset + 0.5, 2*3.141f);
+		offset = fmodf(offset + 0.2, 2*3.141f);
 }
 
 int main() {
@@ -85,23 +85,18 @@ int main() {
 	
 	win = XCreateWindow(dpy, root, 0, 0, 600, 400, 0, CopyFromParent, InputOutput, CopyFromParent, CWEventMask, &swa);
 	
+	Atom wm_state = XInternAtom(dpy, "_NET_WM_STATE", False);
+	Atom fullscreen = XInternAtom(dpy, "_NET_WM_STATE_FULLSCREEN", False);
+	
+	XChangeProperty(dpy, win, wm_state, XA_ATOM, 32, PropModeReplace, (unsigned char*)&fullscreen, 1);
+	int one = 1;
+	Atom non_composited = XInternAtom(dpy, "_HILDON_NON_COMPOSITED_WINDOW", False);
+	XChangeProperty(dpy, win, non_composited, XA_INTEGER, 32, PropModeReplace, (unsigned char*)&one, 1);
+
 	XMapWindow(dpy, win);
 	
 	XStoreName(dpy, win, "GL test");
 	
-	Atom wm_state = XInternAtom(dpy, "_NET_WM_STATE", False);
-	Atom fullscreen = XInternAtom(dpy, "_NET_WM_STATE_FULLSCREEN", False);
-	
-	XEvent xev;
-	memset(&xev, 0, sizeof(xev));
-	xev.type = ClientMessage;
-	xev.xclient.window = win;
-	xev.xclient.message_type = wm_state;
-	xev.xclient.format = 32;
-	xev.xclient.data.l[0] = 1;
-	xev.xclient.data.l[1] = fullscreen;
-	XSendEvent(dpy, DefaultRootWindow(dpy), False, SubstructureNotifyMask, &xev);
-
 	edpy = eglGetDisplay((EGLNativeDisplayType)dpy);
 	if(edpy == EGL_NO_DISPLAY) {
 		printf("Got no EGL display\n");
@@ -186,8 +181,6 @@ int main() {
 					float delta = now.tv_sec - startTime.tv_sec + (now.tv_usec - startTime.tv_usec) * 0.000001f;
 					printf("fps: %f\n", numFrames / delta);
 				}
-				
-				usleep(1000*30);
 	}
 	
 	eglDestroyContext(edpy, ectxt);
