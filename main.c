@@ -3,25 +3,24 @@
  *
  * libraries needed:   libx11-dev, libgles2-dev
  *
- * compile with:   g++  -lX11 -lEGL -lGLESv2  egl-example.cpp
+ * compile with:   gcc  -lX11 -lEGL -lGLESv2  main.cpp
  */
 
-#include  <cstdlib>
-#include  <cstring>
-#include  <iostream>
-using namespace std;
- 
-#include  <cmath>
+#include  <stdlib.h>
+#include  <stdio.h>
+#include  <string.h>
+
+#include  <math.h>
 #include  <sys/time.h>
- 
+
 #include  <X11/Xlib.h>
 #include  <X11/Xatom.h>
- 
+
 #include  <GLES2/gl2.h>
 #include  <EGL/egl.h>
- 
- 
- 
+
+
+
 const char vertex_src [] =
 "                                        \
    attribute vec4        position;       \
@@ -65,10 +64,10 @@ print_shader_info_log (
    glGetShaderiv ( shader , GL_INFO_LOG_LENGTH , &length );
  
    if ( length ) {
-      char* buffer  =  new char [ length ];
+      char* buffer  =  malloc(sizeof (char) * length);
       glGetShaderInfoLog ( shader , length , NULL , buffer );
-      cout << "shader info: " <<  buffer << flush;
-      delete [] buffer;
+      printf ("shader info: %s",  buffer);
+      free (buffer);
  
       GLint success;
       glGetShaderiv( shader, GL_COMPILE_STATUS, &success );
@@ -114,7 +113,7 @@ GLint
  
  
 EGLSurface  egl_surface;
-bool        update_pos = false;
+EGLBoolean  update_pos = EGL_FALSE;
  
 const float vertexArray[] = {
    0.0,  0.5,  0.0,
@@ -159,12 +158,12 @@ void  render()
       offset_x  +=  old_offset_x;
       offset_y  +=  old_offset_y;
  
-      update_pos = false;
+      update_pos = EGL_FALSE;
    }
  
    glUniform4f ( offset_loc  ,  offset_x , offset_y , 0.0 , 0.0 );
  
-   glVertexAttribPointer ( position_loc, 3, GL_FLOAT, false, 0, vertexArray );
+   glVertexAttribPointer ( position_loc, 3, GL_FLOAT, GL_FALSE, 0, vertexArray );
    glEnableVertexAttribArray ( position_loc );
    glDrawArrays ( GL_TRIANGLE_STRIP, 0, 5 );
  
@@ -180,8 +179,7 @@ our_error_handler (
    XErrorEvent* event
    )
 {
-    cout << "cought X11 error " << event->error_code << endl
-         << "  looks like this is not Maemo" << endl;
+    printf ("cought X11 error %d (looks like this is not Maemo)\n", event->error_code);
 }
  
 int  main()
@@ -193,7 +191,7 @@ int  main()
  
    x_display = XOpenDisplay ( NULL );   // open the standard display (the primary screen)
    if ( x_display == NULL ) {
-      cerr << "cannot connect to X server" << endl;
+      fprintf (stderr, "cannot connect to X server\n");
       return 1;
    }
  
@@ -264,12 +262,12 @@ int  main()
  
    egl_display  =  eglGetDisplay( (EGLNativeDisplayType) x_display );
    if ( egl_display == EGL_NO_DISPLAY ) {
-      cerr << "Got no EGL display." << endl;
+      fprintf (stderr, "Got no EGL display.\n");
       return 1;
    }
  
    if ( !eglInitialize( egl_display, NULL, NULL ) ) {
-      cerr << "Unable to initialize EGL" << endl;
+      fprintf (stderr, "Unable to initialize EGL\n");
       return 1;
    }
  
@@ -283,18 +281,18 @@ int  main()
    EGLConfig  ecfg;
    EGLint     num_config;
    if ( !eglChooseConfig( egl_display, attr, &ecfg, 1, &num_config ) ) {
-      cerr << "Failed to choose config (eglError: " << eglGetError() << ")" << endl;
+      fprintf (stderr, "Failed to choose config (eglError: %d)\n", eglGetError());
       return 1;
    }
  
    if ( num_config != 1 ) {
-      cerr << "Didn't get exactly one config, but " << num_config << endl;
+      fprintf (stderr, "Didn't get exactly one config, but %d\n", num_config);
       return 1;
    }
  
    egl_surface = eglCreateWindowSurface ( egl_display, ecfg, (void*)win, NULL );
    if ( egl_surface == EGL_NO_SURFACE ) {
-      cerr << "Unable to create EGL surface (eglError: " << eglGetError() << ")" << endl;
+      fprintf (stderr, "Unable to create EGL surface (eglError: %d\n", eglGetError());
       return 1;
    }
  
@@ -305,7 +303,7 @@ int  main()
    };
    egl_context = eglCreateContext ( egl_display, ecfg, EGL_NO_CONTEXT, ctxattr );
    if ( egl_context == EGL_NO_CONTEXT ) {
-      cerr << "Unable to create EGL context (eglError: " << eglGetError() << ")" << endl;
+      fprintf (stderr, "Unable to create EGL context (eglError: %d\n", eglGetError());
       return 1;
    }
  
@@ -330,7 +328,7 @@ int  main()
    phase_loc     = glGetUniformLocation ( shaderProgram , "phase"    );
    offset_loc    = glGetUniformLocation ( shaderProgram , "offset"   );
    if ( position_loc < 0  ||  phase_loc < 0  ||  offset_loc < 0 ) {
-      cerr << "Unable to get uniform location" << endl;
+      fprintf (stderr, "Unable to get uniform location\n");
       return 1;
    }
  
@@ -341,11 +339,11 @@ int  main()
  
    //// this is needed for time measuring  -->  frames per second
    struct  timezone  tz;
-   timeval  t1, t2;
+   struct timeval  t1, t2;
    gettimeofday ( &t1 , &tz );
    int  num_frames = 0;
  
-   bool quit = false;
+   EGLBoolean quit = EGL_FALSE;
    while ( !quit ) {    // the main loop
  
       while ( XPending ( x_display ) ) {   // check for events from the x-server
@@ -359,10 +357,10 @@ int  main()
             norm_y            =  window_y / (window_height / 2.0);
             GLfloat window_x  =  xev.xmotion.x - window_width / 2.0;
             norm_x            =  window_x / (window_width / 2.0);
-            update_pos = true;
+            update_pos = EGL_TRUE;
          }
  
-         if ( xev.type == KeyPress )   quit = true;
+         if ( xev.type == KeyPress )   quit = EGL_TRUE;
       }
  
       render();   // now we finally put something on the screen
@@ -370,7 +368,7 @@ int  main()
       if ( ++num_frames % 100 == 0 ) {
          gettimeofday( &t2, &tz );
          float dt  =  t2.tv_sec - t1.tv_sec + (t2.tv_usec - t1.tv_usec) * 1e-6;
-         cout << "fps: " << num_frames / dt << endl;
+         printf ("fps: %f\n", num_frames / dt);
          num_frames = 0;
          t1 = t2;
       }

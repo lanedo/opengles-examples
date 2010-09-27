@@ -1,4 +1,7 @@
 all: egl-demo
 
-egl-demo: main.cpp
-	g++ -o $@ $^ -lX11 -lEGL -lGLESv2
+clean:
+	rm -rf egl-demo
+
+egl-demo: main.c
+	gcc -o $@ $^ -lX11 -lEGL -lGLESv2
